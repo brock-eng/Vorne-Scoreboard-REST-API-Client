@@ -1,0 +1,22 @@
+---
+
+# Workstation name
+workstation: "7100"
+
+# Ip Address of scoreboard
+ipAddress: "10.19.12.21"
+
+# Debug mode - set true to enable enhanced console logging
+debug_mode: False
+
+# Keylogger mode - set true to enable SN detection via key input
+keylogger_mode: True
+
+# Default Cycle Time (minutes)
+default_cycle_time: 0.75
+
+### Browser Path
+# Chrome
+browserPath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
+# IE
+# browserPath: "C:/Program Files/Internet Explorer/iexplore.exe"
