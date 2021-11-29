@@ -163,13 +163,24 @@ class WorkStation:
         metadata = self.GET("api/v0/device", jsonToggle = True)
         return int(metadata["data"]["serial_unrecognized_count"]["value"])
 
+    # Returns the current team size
+    def GetTeam(self) -> int:
+        metadata = self.GET("api/v0/team", jsonToggle = True)
+        return int(metadata["data"]["team_size"])
+        
     # Pushes a count value to an input pin
     def InputPin(self, pinNumber, count = 1):
         response = self.POST("api/v0/inputs/" + str(pinNumber), json.dumps({"count": int(count)}))
         return
 
+
+    # Sets a team size
+    def SetTeam(self, size):
+        self.POST("api/v0/team", json.dumps({"team_id" : str(size), "team_size" : int(size)}))
+        return
+
     # Sets the previous downtime reason
-    def DowntimeReason(self, reason):
+    def SetDowntimeReason(self, reason):
         self.POST("api/v0/process_state/reason", json.dumps({"value" : str(reason)}))
         return
 

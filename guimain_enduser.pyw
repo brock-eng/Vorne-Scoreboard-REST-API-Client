@@ -2,7 +2,7 @@
 # This branch has reduced features and is mostly used
 # for polling a scoreboard and activating cuustom barcode commands
 
-version = "1.3 (11/23/2021)"
+version = "1.4 (11/29/2021)"
 
 from tkinter import *
 import threading
@@ -82,6 +82,8 @@ class Application(Frame):
         self.debugMode = config["debug_mode"]
         self.defaultCycleTime = config["default_cycle_time"]
 
+        print(self.defaultCycleTime)
+        
         # Set webbrowser path (set to use chrome)
         browserPath = config["browserPath"]
         webbrowser.register("wb", None, webbrowser.BackgroundBrowser(browserPath))
@@ -345,6 +347,19 @@ class Application(Frame):
             return -1
         return partNo
 
+    # Adds an amount of operators to the current team
+    def TeamAdd(self, size):
+        currentSize = self.ws.GetTeam()
+        newSize = size + currentSize
+        self.ws.SetTeam(newSize)
+        return
+
+    # Starts a new downtime event
+    def DowntimeEvent(self):
+        self.ws.POST("api/v0/process_state/start_down_event", json.dumps({}))
+        self.OutputConsole("Started new downtime event.")
+        return
+
     # Runs a custom scanned command 
     def RunScannedCommand(self, cmd):
         cmd = str(cmd).rstrip()
@@ -361,8 +376,15 @@ class Application(Frame):
             webbrowser.get("wb").open(self.ws.ip)
         elif cmd == "FUNTIMES":
             self.Display(["run", nullArg, "bounce2", 10],)
+        elif cmd == "OPERATORS++":
+            self.TeamAdd(1)
+        elif cmd == "OPERATORS--":
+            self.TeamAdd(-1)
+        elif cmd == "DOWNTIME":
+            self.DowntimeEvent()
         else:
             self.OutputConsole("Warning: Custom command not found: " + str(cmd))
+
 
     # Run the application
     def Run(self):

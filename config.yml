@@ -13,7 +13,7 @@ debug_mode: False
 keylogger_mode: True
 
 # Default Cycle Time (minutes)
-default_cycle_time: 0.75
+default_cycle_time: 1.25
 
 ### Browser Path
 # Chrome
