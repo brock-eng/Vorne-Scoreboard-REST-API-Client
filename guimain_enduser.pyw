@@ -386,7 +386,7 @@ class Application(Frame):
         elif cmd == "DOWNTIME":
             self.ws.StartDowntime()
         elif cmd == "REJECT":
-            self.IncreaseCount(-1)
+            self.ws.InputPin(2, 1)
         else:
             self.OutputConsole("Warning: Custom command not found: " + str(cmd))
 
