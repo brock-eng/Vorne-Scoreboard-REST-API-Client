@@ -168,20 +168,33 @@ class WorkStation:
         metadata = self.GET("api/v0/team", jsonToggle = True)
         return int(metadata["data"]["team_size"])
         
-    # Pushes a count value to an input pin
-    def InputPin(self, pinNumber, count = 1):
-        response = self.POST("api/v0/inputs/" + str(pinNumber), json.dumps({"count": int(count)}))
-        return
-
-
     # Sets a team size
     def SetTeam(self, size):
         self.POST("api/v0/team", json.dumps({"team_id" : str(size), "team_size" : int(size)}))
         return
 
+    # Pushes a count value to an input pin
+    def InputPin(self, pinNumber, count = 1):
+        response = self.POST("api/v0/inputs/" + str(pinNumber), json.dumps({"count": int(count)}))
+        return
+
+    # Gets the current process state
+    def GetProcessState(self) -> str:
+        metadata = self.GET("api/v0/process_state/active", jsonToggle=True)
+        return str(metadata["data"]["name"]) , str(metadata["data"]["information_source"])
+
     # Sets the previous downtime reason
     def SetDowntimeReason(self, reason):
         self.POST("api/v0/process_state/reason", json.dumps({"value" : str(reason)}))
+        return
+
+    # Starts production state
+    def StartProduction(self):
+        self.POST("api/v0/process_state/start_production", json.dumps({}))
+        return
+
+    def StartDowntime(self):
+        self.POST("api/v0/process_state/start_down_event", json.dumps({}))
         return
 
     # Sets active to true/false

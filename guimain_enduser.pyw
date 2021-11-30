@@ -11,6 +11,8 @@ from requests.models import stream_decode_response_unicode
 import yaml
 import time
 
+from yaml.tokens import FlowMappingStartToken
+
 from keylogger import *
 from workstation import *
 from bytecanvas import *
@@ -81,8 +83,7 @@ class Application(Frame):
         self.ws = WorkStation(ipAddress = config["ipAddress"], name = config["workstation"])
         self.debugMode = config["debug_mode"]
         self.defaultCycleTime = config["default_cycle_time"]
-
-        print(self.defaultCycleTime)
+        self.downtimeMultiplier = config["downtime_multiplier"]
         
         # Set webbrowser path (set to use chrome)
         browserPath = config["browserPath"]
@@ -287,27 +288,35 @@ class Application(Frame):
         if partNo == -1:
             return
 
-        # Check if current part run matches new part run
-        # If true then cancel the part run (it's already running the part)
-        currentPartNo = self.ws.GET("api/v0/part_run", jsonToggle=True)["data"]["part_id"]
+        # If not using automatic run detection, start
+        null, currentInfoSource = self.ws.GetProcessState()
+        if currentInfoSource != "run_detector":
+            self.OutputConsole("Starting auto detection.")
+            self.ws.StartProduction()
 
+        # Do not set a new part run if currently running same part
+        currentPartNo = self.ws.GET("api/v0/part_run", jsonToggle=True)["data"]["part_id"]
         if str(partNo) == str(currentPartNo):
             self.OutputConsole("Did not set new part run: {" + str(partNo) + "} is already in production.")
             self.IncreaseCount()
-            return
+        
+        # New part run
+        else:
 
-        # TODO: Add dynamic std. run factor
-        #
-        #
-        # Submit new part run based on catalog num
-        idealTime = self.defaultCycleTime * 60
-        result = self.ws.SetPart(partNo, changeOver=False, ideal=idealTime, takt=idealTime * 1.25, downTime=idealTime * 2)
+            # TODO: Add dynamic std. run factor
+            #
+            #
+            # Submit new part run based on catalog num
+            _idealTime = self.defaultCycleTime * 60
+            _downtime = _idealTime * self.downtimeMultiplier
 
-        if result: 
-            self.IncreaseCount()
-            self.OutputConsole("Converted Serial {SN} to new part run: {PN}".format(SN = serialNum, PN = partNo))
-        else: 
-            self.OutputConsole("Failed to convert serial to new part run.")
+            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_idealTime * 1.25, downTime=_downtime)
+
+            if result: 
+                self.IncreaseCount()
+                self.OutputConsole("Converted Serial {SN} to new part run: {PN}".format(SN = serialNum, PN = partNo))
+            else: 
+                self.OutputConsole("Failed to convert serial to new part run.")
 
         return
 
@@ -354,12 +363,6 @@ class Application(Frame):
         self.ws.SetTeam(newSize)
         return
 
-    # Starts a new downtime event
-    def DowntimeEvent(self):
-        self.ws.POST("api/v0/process_state/start_down_event", json.dumps({}))
-        self.OutputConsole("Started new downtime event.")
-        return
-
     # Runs a custom scanned command 
     def RunScannedCommand(self, cmd):
         cmd = str(cmd).rstrip()
@@ -381,10 +384,11 @@ class Application(Frame):
         elif cmd == "OPERATORS--":
             self.TeamAdd(-1)
         elif cmd == "DOWNTIME":
-            self.DowntimeEvent()
+            self.ws.StartDowntime()
+        elif cmd == "REJECT":
+            self.IncreaseCount(-1)
         else:
             self.OutputConsole("Warning: Custom command not found: " + str(cmd))
-
 
     # Run the application
     def Run(self):

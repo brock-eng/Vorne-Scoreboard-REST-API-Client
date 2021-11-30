@@ -1,5 +1,7 @@
 ---
 
+# Configuration file for vorne control
+# Can be used to set IP, Default Ideal Times, Downtime Multipliers, and more
 # Workstation name
 workstation: "7100"
 
@@ -13,10 +15,14 @@ debug_mode: False
 keylogger_mode: True
 
 # Default Cycle Time (minutes)
-default_cycle_time: 1.25
+default_cycle_time: 0.75
+
+# Default downtime threshold multiplier
+# DT Threshold = default_cycle_time * downtime_multiplier
+downtime_multiplier: 4
 
 ### Browser Path
 # Chrome
-browserPath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
+# browserPath: "C:/Program Files (x86)/Google/Chrome/Application/chrome.exe"
 # IE
-# browserPath: "C:/Program Files/Internet Explorer/iexplore.exe"
+browserPath: "C:/Program Files/Internet Explorer/iexplore.exe"

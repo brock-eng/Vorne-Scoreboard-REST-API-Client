@@ -1,2 +1,4 @@
-@echo off
-robocopy "G:\ZBrock\Vorne\VorneServer\Repo" %cd%
+SET directory = %cd%
+ECHO %directory%
+robocopy "G:\ZBrock\Vorne\VorneServer\Repo" Installation
+pause
