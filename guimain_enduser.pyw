@@ -2,7 +2,7 @@
 # This branch has reduced features and is mostly used
 # for polling a scoreboard and activating cuustom barcode commands
 
-version = "1.4 (11/29/2021)"
+version = "1.5 (12/1/2021)"
 
 from tkinter import *
 import threading
@@ -26,17 +26,6 @@ class Application(Frame):
 
         # Configure App, set Keybinds, class variables, etc.
         self.Configure()
-
-        # Tracked Running Programs
-        self.runningPrograms = dict()
-        
-        self.runningLoop = True
-        self.scanID = -1
-        self.pollingDuration = 1
-
-        # App title
-        self.root.title('Seats-Vorne Control Server'.format(version=self.version))
-
 
         # Startup Message
         self.OutputConsole('Running for workstation: {name} at ip {ip}'.format(name=self.ws.name, ip=self.ws.ip))
@@ -81,10 +70,16 @@ class Application(Frame):
         stream = open("config.yml", 'r')
         config = yaml.safe_load(stream)
         self.ws = WorkStation(ipAddress = config["ipAddress"], name = config["workstation"])
-        self.debugMode = config["debug_mode"]
+        self.debugMode = config["debug_mode"]  
         self.defaultCycleTime = config["default_cycle_time"]
         self.downtimeMultiplier = config["downtime_multiplier"]
         
+        # Class State Variables
+        self.runningPrograms = dict()   # Custom programs
+        self.scanID = -1                # ScanID of the last unrecognized vorne scan
+        self.pollingDuration = 1        # How long between each scoreboard poll (connection)
+        self.serialNos = list()         # List of previously scanned serials
+
         # Set webbrowser path (set to use chrome)
         browserPath = config["browserPath"]
         webbrowser.register("wb", None, webbrowser.BackgroundBrowser(browserPath))
@@ -95,10 +90,14 @@ class Application(Frame):
         # Start minimized
         self.root.wm_state('iconic')
         
-        # keylogger support
+        # Keylogger support
         self.keyloggerMode = config["keylogger_mode"]
         if self.keyloggerMode:
             self.keylogger = KeyLogger()
+
+
+        # App title
+        self.root.title('Seats-Vorne Control Server'.format(version=self.version))
         return
 
     # Output a console message
@@ -283,6 +282,14 @@ class Application(Frame):
         if parse:
             serialNum = str(serialNum[1:]).rstrip()   # remove 'S' and '\r' from SN
 
+        # Check if serial already scanned, if it has been scanned we ignore this scan
+        if serialNum in self.serialNos:
+            self.ws.Scoreboard.Display(line1 = "Warning:", line2 = "Duplicate SN", line3 = "scanned.", time = 5)
+            self.OutputConsole("Detected a duplicate serialNo: " + serialNum)
+            return
+        else:
+            self.serialNos.append(serialNum)
+
         # Convert serial to catalog
         partNo = self.ConvertSerial(serialNum)
         if partNo == -1:
@@ -310,7 +317,7 @@ class Application(Frame):
             _idealTime = self.defaultCycleTime * 60
             _downtime = _idealTime * self.downtimeMultiplier
 
-            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_idealTime * 1.25, downTime=_downtime)
+            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_idealTime * 1, downTime=_downtime)
 
             if result: 
                 self.IncreaseCount()

@@ -19,7 +19,7 @@ default_cycle_time: 0.75
 
 # Default downtime threshold multiplier
 # DT Threshold = default_cycle_time * downtime_multiplier
-downtime_multiplier: 4
+downtime_multiplier: 5
 
 ### Browser Path
 # Chrome
