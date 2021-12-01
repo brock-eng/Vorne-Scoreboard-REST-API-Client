@@ -7,11 +7,9 @@ version = "1.5 (12/1/2021)"
 from tkinter import *
 import threading
 import webbrowser
-from requests.models import stream_decode_response_unicode
 import yaml
 import time
-
-from yaml.tokens import FlowMappingStartToken
+import csv
 
 from keylogger import *
 from workstation import *
@@ -39,6 +37,8 @@ class Application(Frame):
         if self.debugMode:
             self.OutputConsole('Running in debug mode: Enhanced message reporting.')
         
+        # self.DebugTesting()
+
         # Start main control program
         self.StartPolling()
 
@@ -73,6 +73,7 @@ class Application(Frame):
         self.debugMode = config["debug_mode"]  
         self.defaultCycleTime = config["default_cycle_time"]
         self.downtimeMultiplier = config["downtime_multiplier"]
+        self.idealTimeFudgeFactor = config["ideal_time_fudge_factor"]
         
         # Class State Variables
         self.runningPrograms = dict()   # Custom programs
@@ -95,6 +96,8 @@ class Application(Frame):
         if self.keyloggerMode:
             self.keylogger = KeyLogger()
 
+        # CSV File location (for std lookup times)
+        self.dataFilePath = config["time_data_file"]
 
         # App title
         self.root.title('Seats-Vorne Control Server'.format(version=self.version))
@@ -309,13 +312,16 @@ class Application(Frame):
         
         # New part run
         else:
+            # Dynamic time lookup
+            lookupTime = self.LookupTimes(partNo)
+            currentTeamCount = self.ws.GetTeam()
 
-            # TODO: Add dynamic std. run factor
-            #
-            #
-            # Submit new part run based on catalog num
-            _idealTime = self.defaultCycleTime * 60
-            _downtime = _idealTime * self.downtimeMultiplier
+            if lookupTime > 0: # found part time
+                _idealTime = lookupTime / float(currentTeamCount) * 60 * self.idealTimeFudgeFactor
+                _downtime = _idealTime * self.downtimeMultiplier
+            else: # not found or zero time amount, apply default times
+                _idealTime = self.defaultCycleTime * 60
+                _downtime = _idealTime * self.downtimeMultiplier
 
             result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_idealTime * 1, downTime=_downtime)
 
@@ -333,23 +339,45 @@ class Application(Frame):
         self.OutputConsole("Incremented count by {count}", self.debugMode)
 
     # Sets a part run (For command line functionality)
-    def SetPartNo(self, PartNo):
+    def SetPartNo(self, partNo):
         # Set display to on if not already on
         if self.ws.Scoreboard.GetImageMode() != "none":
             self.Display(["TURNON"])
 
-        # Check if current part run matches new part run
-        # If true then cancel the part run (it's already running the part)
+        # If not using automatic run detection, start
+        null, currentInfoSource = self.ws.GetProcessState()
+        if currentInfoSource != "run_detector":
+            self.OutputConsole("Starting auto detection.")
+            self.ws.StartProduction()
+
+        # Do not set a new part run if currently running same part
         currentPartNo = self.ws.GET("api/v0/part_run", jsonToggle=True)["data"]["part_id"]
+        if str(partNo) == str(currentPartNo):
+            self.OutputConsole("Did not set new part run: {" + str(partNo) + "} is already in production.")
+            self.IncreaseCount()
 
-        if str(PartNo) == str(currentPartNo):
-            self.OutputConsole("Did not set new part run: {" + str(PartNo) + "} is already in production.")
-            return
+        # New part run
+        else:
 
-        # Call set part command
-        self.ws.SetPart(PartNo, changeOver=False)
-        
-        self.OutputConsole("Set {" + self.ws.name + "} part run to " + str(PartNo) + ".")
+            # Dynamic time lookup
+            lookupTime = self.LookupTimes(partNo)
+            currentTeamCount = self.ws.GetTeam()
+
+            if lookupTime > 0: # found part time
+                _idealTime = lookupTime / float(currentTeamCount) * 60
+                _downtime = _idealTime * self.downtimeMultiplier
+            else: # not found or zero time amount, apply default times
+                _idealTime = self.defaultCycleTime * 60
+                _downtime = _idealTime * self.downtimeMultiplier
+
+            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_idealTime * 1, downTime=_downtime)
+
+            if result: 
+                self.IncreaseCount()
+                self.OutputConsole("Set {" + self.ws.name + "} part run to " + str(partNo) + ".")
+            else: 
+                self.OutputConsole("Failed to set a to new part run.")
+
         return
 
     # Grab a catalog number using the seats-api endpoint
@@ -394,8 +422,36 @@ class Application(Frame):
             self.ws.StartDowntime()
         elif cmd == "REJECT":
             self.ws.InputPin(2, 1)
+        elif cmd == "UNKNOWNPART":
+            self.OutputConsole("Warning: starting a part run using an unknown part.")
+            self.SetPartNo(["Placeholder Part"])
         else:
             self.OutputConsole("Warning: Custom command not found: " + str(cmd))
+
+    # Lookup std run times from a pre-built csv file
+    def LookupTimes(self, partNo) -> float:
+        with open(self.dataFilePath) as dataFile:
+            dataReader = csv.reader(dataFile)
+            found = False
+            foundTime = 0
+
+            # loop through each row and try to find the matching part
+            for row in enumerate(dataReader):
+                storedPartNo = str(row[1][0])
+                stdRunTime = str(row[1][1])
+
+                if str(partNo).upper() == str(storedPartNo).upper():
+                    # found a match
+                    foundTime = stdRunTime
+                    found = True
+                    break
+            
+            if not found:
+                self.OutputConsole("Could not find stdRunFactor for part: {0}".format(partNo))
+                return float(-1)
+            else:
+                self.OutputConsole("Found a part run time of: {0}".format(foundTime))
+                return float(foundTime)
 
     # Run the application
     def Run(self):
@@ -411,6 +467,24 @@ class Application(Frame):
         time.sleep(self.pollingDuration * 1.5)
 
         self.root.destroy()
+
+    # Testing function
+    def DebugTesting(self):
+        partNo = "185196VN1204"
+        lookupTime = self.LookupTimes(partNo)
+        currentTeamCount = self.ws.GetTeam()
+
+        if lookupTime > 0: # found part time
+            _idealTime = lookupTime / float(currentTeamCount) * 60 * self.idealTimeFudgeFactor
+            _downtime = _idealTime * self.downtimeMultiplier
+        else: # not found, apply default times
+            _idealTime = self.defaultCycleTime * 60
+            _downtime = _idealTime * self.downtimeMultiplier
+        
+        print(partNo)
+        print("Total:", lookupTime)
+        print("TeamSize:", currentTeamCount)
+        print("Ideal and downtime:",_idealTime, _downtime)
 
         
 def main():
