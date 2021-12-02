@@ -19,7 +19,7 @@ default_cycle_time: 0.75
 
 # Default downtime threshold multiplier
 # DT Threshold = default_cycle_time * downtime_multiplier
-downtime_multiplier: 5
+downtime_multiplier: 6.5
 
 ### Browser Path
 # Chrome
@@ -30,7 +30,14 @@ browserPath: "C:/Program Files/Internet Explorer/iexplore.exe"
 # CSV Run times file path
 time_data_file: "N:/ZBrock/Vorne/Run_Times_12_1_2021.csv"
 
-# Factor for adjusting the ideal times that are pulled from oracle
+# Toggle whether the program should attempt to lookup standard run times
+# If set to false, uses default times
+lookup_times: True
+
+# Factor for adjusting the ideal time found in oracle
 # If they are by default too high, multiply by a number < 1 (i.e. 0.9 for 10% reduction in ideal times)
-# If they are by default low, multiply by a number > 1  (i.e. 1.1 for a 10% increase in ideal times)
+# If they are by default too low, multiply by a number > 1  (i.e. 1.1 for a 10% increase in ideal times)
 ideal_time_fudge_factor: 0.9
+
+# Factor for adjusting the ideal time to an associated takt time
+takt_time_factor: 1.2

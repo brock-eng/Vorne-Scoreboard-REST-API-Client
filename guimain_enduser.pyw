@@ -16,6 +16,9 @@ from workstation import *
 from bytecanvas import *
 from programs import Program
 
+HOURS_TO_SECONDS = int(3600)
+MINUTES_TO_SECONDS = int(60)
+
 class Application(Frame):
     # Application startup
     def __init__(self) -> None:
@@ -71,10 +74,12 @@ class Application(Frame):
         config = yaml.safe_load(stream)
         self.ws = WorkStation(ipAddress = config["ipAddress"], name = config["workstation"])
         self.debugMode = config["debug_mode"]  
-        self.defaultCycleTime = config["default_cycle_time"]
+        self.defaultCycleTime = config["default_cycle_time"] * MINUTES_TO_SECONDS
         self.downtimeMultiplier = config["downtime_multiplier"]
         self.idealTimeFudgeFactor = config["ideal_time_fudge_factor"]
-        
+        self.lookupSetting = config["lookup_times"]
+        self.taktTimeFactor = config["takt_time_factor"]
+
         # Class State Variables
         self.runningPrograms = dict()   # Custom programs
         self.scanID = -1                # ScanID of the last unrecognized vorne scan
@@ -98,6 +103,11 @@ class Application(Frame):
 
         # CSV File location (for std lookup times)
         self.dataFilePath = config["time_data_file"]
+        try:
+            open(self.dataFilePath)
+        except:
+            self.OutputConsole("Couldn't open data file.  Setting times to default.")
+            self.lookupSetting = False
 
         # App title
         self.root.title('Seats-Vorne Control Server'.format(version=self.version))
@@ -251,7 +261,7 @@ class Application(Frame):
                 time.sleep(self.pollingDuration)
                 self.connectionStatus.config(text="Connected {date}".format(date = datetime.now().strftime("%H:%M:%S")))
             except:
-                self.OutputConsole("Connection Error: " + self.ws.ip)
+                self.OutputConsole("Error: " + self.ws.ip)
                 self.connectionStatus.config(text="Not Connected {date}".format(date = datetime.now().strftime("%H:%M:%S")))
         
         return
@@ -312,18 +322,32 @@ class Application(Frame):
         
         # New part run
         else:
-            # Dynamic time lookup
-            lookupTime = self.LookupTimes(partNo)
-            currentTeamCount = self.ws.GetTeam()
+            try:
+                # Dynamic time lookup
+                if self.lookupSetting:
+                    # Get current team, if < 0 set to a default of 10
+                    currentTeamCount = self.ws.GetTeam()
+                    if currentTeamCount <= 0: 
+                        currentTeamCount = 14
+                        self.OutputConsole("Warning: Did not find a correct team size.  Defaulted to 14.")
 
-            if lookupTime > 0: # found part time
-                _idealTime = lookupTime / float(currentTeamCount) * 60 * self.idealTimeFudgeFactor
-                _downtime = _idealTime * self.downtimeMultiplier
-            else: # not found or zero time amount, apply default times
-                _idealTime = self.defaultCycleTime * 60
-                _downtime = _idealTime * self.downtimeMultiplier
+                    lookupTime = self.LookupTimes(partNo)
+                    if lookupTime > 0: # found part time
+                        _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
+                    else: # not found or zero time amount, apply default times
+                        _idealTime = self.defaultCycleTime
+                
+                # Default time settings
+                else:
+                    _idealTime = self.defaultCycleTime
+            except: 
+                self.OutputConsole("Program error: Could not lookup times for part {0}".format(partNo))
+                _idealTime = self.defaultCycleTime
 
-            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_idealTime * 1, downTime=_downtime)
+            _downtime = _idealTime * self.downtimeMultiplier
+            _taktTime = _idealTime * self.taktTimeFactor
+
+            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_taktTime, downTime=_downtime)
 
             if result: 
                 self.IncreaseCount()
@@ -358,19 +382,32 @@ class Application(Frame):
 
         # New part run
         else:
+            try:
+                # Dynamic time lookup
+                if self.lookupSetting:
+                    # Get current team, if < 0 set to a default of 10
+                    currentTeamCount = self.ws.GetTeam()
+                    if currentTeamCount <= 0: 
+                        currentTeamCount = 14
+                        self.OutputConsole("Warning: Did not find a correct team size.  Defaulted to 14.")
 
-            # Dynamic time lookup
-            lookupTime = self.LookupTimes(partNo)
-            currentTeamCount = self.ws.GetTeam()
+                    lookupTime = self.LookupTimes(partNo)
+                    if lookupTime > 0: # found part time
+                        _idealTime = lookupTime / float(currentTeamCount)
+                    else: # not found or zero time amount, apply default times
+                        _idealTime = self.defaultCycleTime
+                
+                # Default time settings
+                else:
+                    _idealTime = self.defaultCycleTime
+            except: 
+                self.OutputConsole("Program error: Could not lookup times for part {0}".format(partNo))
+                _idealTime = self.defaultCycleTime
 
-            if lookupTime > 0: # found part time
-                _idealTime = lookupTime / float(currentTeamCount) * 60
-                _downtime = _idealTime * self.downtimeMultiplier
-            else: # not found or zero time amount, apply default times
-                _idealTime = self.defaultCycleTime * 60
-                _downtime = _idealTime * self.downtimeMultiplier
+            _downtime = _idealTime * self.downtimeMultiplier
+            _taktTime = _idealTime * self.taktTimeFactor
 
-            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_idealTime * 1, downTime=_downtime)
+            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_taktTime * 1, downTime=_downtime)
 
             if result: 
                 self.IncreaseCount()
@@ -442,7 +479,7 @@ class Application(Frame):
 
                 if str(partNo).upper() == str(storedPartNo).upper():
                     # found a match
-                    foundTime = stdRunTime
+                    foundTime = float(stdRunTime) * HOURS_TO_SECONDS
                     found = True
                     break
             
@@ -450,7 +487,7 @@ class Application(Frame):
                 self.OutputConsole("Could not find stdRunFactor for part: {0}".format(partNo))
                 return float(-1)
             else:
-                self.OutputConsole("Found a part run time of: {0}".format(foundTime))
+                self.OutputConsole("Found a part run time of {0} for part {1}".format(foundTime, partNo))
                 return float(foundTime)
 
     # Run the application
@@ -470,21 +507,26 @@ class Application(Frame):
 
     # Testing function
     def DebugTesting(self):
-        partNo = "185196VN1204"
-        lookupTime = self.LookupTimes(partNo)
-        currentTeamCount = self.ws.GetTeam()
+        if self.lookupSetting:
+            testPartNos = list()
+            testPartNos = ["186586VD478", "Nonsense", "188441VD731", "128596VN06", "131526HN303"]
+            for partNo in testPartNos:
+                lookupTime = self.LookupTimes(partNo)
+                currentTeamCount = self.ws.GetTeam()
+                print(partNo)
+                print("Lookuptime:", lookupTime)
+                print("TeamSize:", currentTeamCount)
 
-        if lookupTime > 0: # found part time
-            _idealTime = lookupTime / float(currentTeamCount) * 60 * self.idealTimeFudgeFactor
-            _downtime = _idealTime * self.downtimeMultiplier
-        else: # not found, apply default times
-            _idealTime = self.defaultCycleTime * 60
-            _downtime = _idealTime * self.downtimeMultiplier
-        
-        print(partNo)
-        print("Total:", lookupTime)
-        print("TeamSize:", currentTeamCount)
-        print("Ideal and downtime:",_idealTime, _downtime)
+                if lookupTime > 0: # found part time
+                    _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
+                    _downtime = _idealTime * self.downtimeMultiplier
+                    _taktTime = _idealTime * self.taktTimeFactor
+                else: # not found, apply default times
+                    _idealTime = self.defaultCycleTime
+                    _downtime = _idealTime * self.downtimeMultiplier
+                    _taktTime = _idealTime * self.taktTimeFactor
+                
+                print("Ideal and downtime:",_idealTime, _downtime, _taktTime, "\n")
 
         
 def main():
