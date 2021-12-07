@@ -40,10 +40,10 @@ class Application(Frame):
         if self.debugMode:
             self.OutputConsole('Running in debug mode: Enhanced message reporting.')
         
-        self.DebugTesting()
+        # self.DebugTesting()
 
         # Start main control program
-        # self.StartPolling()
+        self.StartPolling()
 
     # Builds and formats tkinter widgets
     def Build(self):
@@ -512,7 +512,7 @@ class Application(Frame):
 
         if self.lookupSetting:
             testPartNos = list()
-            testPartNos = ["183748VE1233", "186365FD31", "188760VD744"]
+            testPartNos = ["183748VE1233", "186365FD31", "188760VD744", "185951VD1146"]
             for partNo in testPartNos:
                 lookupTime = self.LookupTimes(partNo)
                 currentTeamCount = 15
