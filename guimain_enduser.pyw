@@ -2,7 +2,6 @@
 # This branch has reduced features and is mostly used
 # for polling a scoreboard and activating cuustom barcode commands
 
-version = "1.5 (12/1/2021)"
 
 from tkinter import *
 import threading
@@ -16,6 +15,7 @@ from workstation import *
 from bytecanvas import *
 from programs import Program
 
+VERSION = str("1.6 (12/6/2021)")
 HOURS_TO_SECONDS = int(3600)
 MINUTES_TO_SECONDS = int(60)
 
@@ -30,7 +30,7 @@ class Application(Frame):
 
         # Startup Message
         self.OutputConsole('Running for workstation: {name} at ip {ip}'.format(name=self.ws.name, ip=self.ws.ip))
-        self.OutputConsole('Software Version: {version}'.format(version = self.version))
+        self.OutputConsole('Software Version: {0}'.format(VERSION))
         
         if self.keyloggerMode:
             self.OutputConsole('Running keylogger SN detection.')
@@ -40,10 +40,10 @@ class Application(Frame):
         if self.debugMode:
             self.OutputConsole('Running in debug mode: Enhanced message reporting.')
         
-        # self.DebugTesting()
+        self.DebugTesting()
 
         # Start main control program
-        self.StartPolling()
+        # self.StartPolling()
 
     # Builds and formats tkinter widgets
     def Build(self):
@@ -65,20 +65,20 @@ class Application(Frame):
         self.consoleOutput.configure(state=DISABLED)
         return
         
-
     # App configuration settings
     def Configure(self):
         # Opening config file and getting settings
-        self.version = version
         stream = open("config.yml", 'r')
         config = yaml.safe_load(stream)
         self.ws = WorkStation(ipAddress = config["ipAddress"], name = config["workstation"])
-        self.debugMode = config["debug_mode"]  
-        self.defaultCycleTime = config["default_cycle_time"] * MINUTES_TO_SECONDS
-        self.downtimeMultiplier = config["downtime_multiplier"]
-        self.idealTimeFudgeFactor = config["ideal_time_fudge_factor"]
-        self.lookupSetting = config["lookup_times"]
-        self.taktTimeFactor = config["takt_time_factor"]
+        self.debugMode =            bool(config["debug_mode"])
+        self.lookupSetting =        bool(config["lookup_times"])
+        self.dupSNPrevention =      bool(config["duplicate_serial_prevention"])
+        self.defaultCycleTime =     float(config["default_cycle_time"] * MINUTES_TO_SECONDS)
+        self.downtimeMultiplier =   float(config["downtime_multiplier"])
+        self.idealTimeFudgeFactor = float(config["ideal_time_fudge_factor"])
+        self.taktTimeFactor =       float(config["takt_time_factor"])
+        self.minimumTeamCount =     int(config["minimum_team_count"])
 
         # Class State Variables
         self.runningPrograms = dict()   # Custom programs
@@ -106,11 +106,11 @@ class Application(Frame):
         try:
             open(self.dataFilePath)
         except:
-            self.OutputConsole("Couldn't open data file.  Setting times to default.")
+            self.OutputConsole("Couldn't open data file.  All run times will be set to default.")
             self.lookupSetting = False
 
         # App title
-        self.root.title('Seats-Vorne Control Server'.format(version=self.version))
+        self.root.title('Seats-Vorne Control Server')
         return
 
     # Output a console message
@@ -292,6 +292,8 @@ class Application(Frame):
     # Reads the last unrecognized scan
     # Converts to catalog number and starts a new part run
     def ConvertSerialPartRun(self, serialNum, parse = True):
+
+        # Trim serial
         if parse:
             serialNum = str(serialNum[1:]).rstrip()   # remove 'S' and '\r' from SN
 
@@ -308,59 +310,9 @@ class Application(Frame):
         if partNo == -1:
             return
 
-        # If not using automatic run detection, start
-        null, currentInfoSource = self.ws.GetProcessState()
-        if currentInfoSource != "run_detector":
-            self.OutputConsole("Starting auto detection.")
-            self.ws.StartProduction()
-
-        # Do not set a new part run if currently running same part
-        currentPartNo = self.ws.GET("api/v0/part_run", jsonToggle=True)["data"]["part_id"]
-        if str(partNo) == str(currentPartNo):
-            self.OutputConsole("Did not set new part run: {" + str(partNo) + "} is already in production.")
-            self.IncreaseCount()
-        
-        # New part run
-        else:
-            try:
-                # Dynamic time lookup
-                if self.lookupSetting:
-                    # Get current team, if < 0 set to a default of 10
-                    currentTeamCount = self.ws.GetTeam()
-                    if currentTeamCount <= 0: 
-                        currentTeamCount = 14
-                        self.OutputConsole("Warning: Did not find a correct team size.  Defaulted to 14.")
-
-                    lookupTime = self.LookupTimes(partNo)
-                    if lookupTime > 0: # found part time
-                        _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
-                    else: # not found or zero time amount, apply default times
-                        _idealTime = self.defaultCycleTime
-                
-                # Default time settings
-                else:
-                    _idealTime = self.defaultCycleTime
-            except: 
-                self.OutputConsole("Program error: Could not lookup times for part {0}".format(partNo))
-                _idealTime = self.defaultCycleTime
-
-            _downtime = _idealTime * self.downtimeMultiplier
-            _taktTime = _idealTime * self.taktTimeFactor
-
-            result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_taktTime, downTime=_downtime)
-
-            if result: 
-                self.IncreaseCount()
-                self.OutputConsole("Converted Serial {SN} to new part run: {PN}".format(SN = serialNum, PN = partNo))
-            else: 
-                self.OutputConsole("Failed to convert serial to new part run.")
+        self.SetPartNo(partNo)
 
         return
-
-    # Increments the scoreboard count by a certain amount
-    def IncreaseCount(self, count = 1):
-        self.ws.InputPin(1, count)
-        self.OutputConsole("Incremented count by {count}", self.debugMode)
 
     # Sets a part run (For command line functionality)
     def SetPartNo(self, partNo):
@@ -377,7 +329,7 @@ class Application(Frame):
         # Do not set a new part run if currently running same part
         currentPartNo = self.ws.GET("api/v0/part_run", jsonToggle=True)["data"]["part_id"]
         if str(partNo) == str(currentPartNo):
-            self.OutputConsole("Did not set new part run: {" + str(partNo) + "} is already in production.")
+            self.OutputConsole("Info: {" + str(partNo) + "} is already in production.  Incrementing count + 1")
             self.IncreaseCount()
 
         # New part run
@@ -385,15 +337,17 @@ class Application(Frame):
             try:
                 # Dynamic time lookup
                 if self.lookupSetting:
+
                     # Get current team, if < 0 set to a default of 10
                     currentTeamCount = self.ws.GetTeam()
-                    if currentTeamCount <= 0: 
-                        currentTeamCount = 14
-                        self.OutputConsole("Warning: Did not find a correct team size.  Defaulted to 14.")
+
+                    if currentTeamCount <= self.minimumTeamCount:
+                        currentTeamCount = self.minimumTeamCount
 
                     lookupTime = self.LookupTimes(partNo)
+
                     if lookupTime > 0: # found part time
-                        _idealTime = lookupTime / float(currentTeamCount)
+                        _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
                     else: # not found or zero time amount, apply default times
                         _idealTime = self.defaultCycleTime
                 
@@ -415,6 +369,12 @@ class Application(Frame):
             else: 
                 self.OutputConsole("Failed to set a to new part run.")
 
+        return
+
+    # Increments the scoreboard count by a certain amount
+    def IncreaseCount(self, count = 1):
+        self.ws.InputPin(1, count)
+        self.OutputConsole("Incremented count by {count}", self.debugMode)
         return
 
     # Grab a catalog number using the seats-api endpoint
@@ -490,6 +450,46 @@ class Application(Frame):
                 self.OutputConsole("Found a part run time of {0} for part {1}".format(foundTime, partNo))
                 return float(foundTime)
 
+    # Refresh the current part run with possibly updated settings
+    def RefreshPartRun(self):
+        
+        partNo = self.ws.GET("api/v0/part_run", jsonToggle=True)["data"]["part_id"]
+        
+        try:
+            # Dynamic time lookup
+            if self.lookupSetting:
+                # Get current team, if < 0 set to a default of 10
+                currentTeamCount = self.ws.GetTeam()
+                if currentTeamCount <= 0: 
+                    currentTeamCount = 14
+                    self.OutputConsole("Warning: Did not find a correct team size.  Defaulted to 14.")
+                elif currentTeamCount <= self.minimumTeamCount:
+                    currentTeamCount = self.minimumTeamCount
+
+                lookupTime = self.LookupTimes(partNo)
+                if lookupTime > 0: # found part time
+                    _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
+                else: # not found or zero time amount, apply default times
+                    _idealTime = self.defaultCycleTime
+            
+            # Default time settings
+            else:
+                _idealTime = self.defaultCycleTime
+        except: 
+            self.OutputConsole("Program error: Could not lookup times for part {0}".format(partNo))
+            _idealTime = self.defaultCycleTime
+
+        _downtime = _idealTime * self.downtimeMultiplier
+        _taktTime = _idealTime * self.taktTimeFactor
+
+        result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_taktTime * 1, downTime=_downtime)
+
+        if result: 
+            self.IncreaseCount()
+            self.OutputConsole("Set {" + self.ws.name + "} part run to " + str(partNo) + ".")
+        else: 
+            self.OutputConsole("Failed to set a to new part run.")
+
     # Run the application
     def Run(self):
         self.root.mainloop()
@@ -507,12 +507,15 @@ class Application(Frame):
 
     # Testing function
     def DebugTesting(self):
+        if self.lookupSetting == False:
+            print("Error: Not using lookupsetting.")
+
         if self.lookupSetting:
             testPartNos = list()
-            testPartNos = ["186586VD478", "Nonsense", "188441VD731", "128596VN06", "131526HN303"]
+            testPartNos = ["183748VE1233", "186365FD31", "188760VD744"]
             for partNo in testPartNos:
                 lookupTime = self.LookupTimes(partNo)
-                currentTeamCount = self.ws.GetTeam()
+                currentTeamCount = 15
                 print(partNo)
                 print("Lookuptime:", lookupTime)
                 print("TeamSize:", currentTeamCount)
@@ -526,7 +529,7 @@ class Application(Frame):
                     _downtime = _idealTime * self.downtimeMultiplier
                     _taktTime = _idealTime * self.taktTimeFactor
                 
-                print("Ideal and downtime:",_idealTime, _downtime, _taktTime, "\n")
+                print("Ideal: ",_idealTime, "\nTakt: ", _taktTime, "\n")
 
         
 def main():

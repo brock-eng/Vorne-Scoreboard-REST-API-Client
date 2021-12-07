@@ -19,7 +19,10 @@ default_cycle_time: 0.75
 
 # Default downtime threshold multiplier
 # DT Threshold = default_cycle_time * downtime_multiplier
-downtime_multiplier: 6.5
+downtime_multiplier: 10
+
+# Prevent duplicate serial numbers from being counted
+duplicate_serial_prevention: True
 
 ### Browser Path
 # Chrome
@@ -34,10 +37,15 @@ time_data_file: "N:/ZBrock/Vorne/Run_Times_12_1_2021.csv"
 # If set to false, uses default times
 lookup_times: True
 
+### Cycle time adjustments
 # Factor for adjusting the ideal time found in oracle
 # If they are by default too high, multiply by a number < 1 (i.e. 0.9 for 10% reduction in ideal times)
 # If they are by default too low, multiply by a number > 1  (i.e. 1.1 for a 10% increase in ideal times)
-ideal_time_fudge_factor: 0.9
+ideal_time_fudge_factor: 0.7
 
 # Factor for adjusting the ideal time to an associated takt time
-takt_time_factor: 1.2
+### takt_time = std_hours_in / team_size * ideal_time_fudge_factor * takt_time_factor
+takt_time_factor: 1.25
+
+# Minimum team count for efficiency calculations
+minimum_team_count: 15
