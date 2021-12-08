@@ -40,10 +40,10 @@ class Application(Frame):
         if self.debugMode:
             self.OutputConsole('Running in debug mode: Enhanced message reporting.')
         
-        # self.DebugTesting()
+        self.DebugTesting()
 
         # Start main control program
-        self.StartPolling()
+        # self.StartPolling()
 
     # Builds and formats tkinter widgets
     def Build(self):
@@ -123,7 +123,8 @@ class Application(Frame):
         self.consoleOutput.see(END)
         self.consoleOutput.configure(state='disabled')
 
-    # Alters the current scoreboard display
+    # For all subcommands that alter the display directly
+    # at the pixel level
     def Display(self, *args):
         if str(args[0][0]).upper() == 'MODE':
             result = self.ws.Scoreboard.SetImageMode(args[0][1])
@@ -531,7 +532,7 @@ class Application(Frame):
                 
                 print("Ideal: ",_idealTime, "\nTakt: ", _taktTime, "\n")
 
-        
+
 def main():
     ConsoleApp = Application()
     ConsoleApp.Run()
