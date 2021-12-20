@@ -319,7 +319,7 @@ class Application(Frame):
         return
 
     # Sets a part run (For command line functionality)
-    def SetPartNo(self, partNo):
+    def SetPartNo(self, partNo, lookupTime = True):
         # Set display to on if not already on
         if self.ws.Scoreboard.GetImageMode() != "none":
             self.Display(["TURNON"])
@@ -340,7 +340,7 @@ class Application(Frame):
         else:
             try:
                 # Dynamic time lookup
-                if self.lookupSetting:
+                if self.lookupSetting and lookupTime:
 
                     # Get current team, if < 0 set to a default of 10
                     currentTeamCount = self.ws.GetTeam()
@@ -427,7 +427,7 @@ class Application(Frame):
             self.OutputConsole("Warning: starting a part run using an unknown part.")
             self.SetPartNo(["Placeholder Part"])
         elif cmd == "CVGSEAT":
-            self.SetPartNo(partNo = "CVG Seat")
+            self.SetPartNo(partNo = "CVG Seat", lookupTime=False)
         else:
             self.OutputConsole("Warning: Custom command not found: " + str(cmd))
 
