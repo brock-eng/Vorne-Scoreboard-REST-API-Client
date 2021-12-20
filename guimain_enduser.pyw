@@ -15,7 +15,7 @@ from workstation import *
 from bytecanvas import *
 from programs import Program
 
-VERSION = str("1.6 (12/6/2021)")
+VERSION = str("1.7 (12/20/2021)")
 HOURS_TO_SECONDS = int(3600)
 MINUTES_TO_SECONDS = int(60)
 
