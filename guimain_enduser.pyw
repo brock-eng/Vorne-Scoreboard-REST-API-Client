@@ -43,7 +43,7 @@ class Application(Frame):
         self.DebugTesting()
 
         # Start main control program
-        # self.StartPolling()
+        self.StartPolling()
 
     # Builds and formats tkinter widgets
     def Build(self):
@@ -53,9 +53,12 @@ class Application(Frame):
         # Creating Widgets
         self.connectionStatus = Label()
         self.consoleOutputLabel = Label(text = 'Console Log')
-        self.consoleOutput = Text()
+        self.consoleOutputScrollBar = Scrollbar(self.root)
+        self.consoleOutput = Text(self.root, yscrollcommand=self.consoleOutputScrollBar.set)
         
         # Formatting Widgets
+        self.consoleOutputScrollBar.pack(side=RIGHT, fill = Y)
+        self.consoleOutputScrollBar.config( command = self.consoleOutput.yview )
         self.root.iconbitmap('res\img\seats.ico')
         self.connectionStatus.place(x = 0)
         self.consoleOutputLabel.place(x = 0)
@@ -423,6 +426,8 @@ class Application(Frame):
         elif cmd == "UNKNOWNPART":
             self.OutputConsole("Warning: starting a part run using an unknown part.")
             self.SetPartNo(["Placeholder Part"])
+        elif cmd == "CVGSEAT":
+            self.SetPartNo(partNo = "CVG Seat")
         else:
             self.OutputConsole("Warning: Custom command not found: " + str(cmd))
 
@@ -531,6 +536,9 @@ class Application(Frame):
                     _taktTime = _idealTime * self.taktTimeFactor
                 
                 print("Ideal: ",_idealTime, "\nTakt: ", _taktTime, "\n")
+
+        for i in range(50):
+            self.OutputConsole("Test" + str(i))
 
 
 def main():
