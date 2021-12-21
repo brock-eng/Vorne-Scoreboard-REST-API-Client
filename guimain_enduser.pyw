@@ -43,7 +43,7 @@ class Application(Frame):
         self.DebugTesting()
 
         # Start main control program
-        self.StartPolling()
+        # self.StartPolling()
 
     # Builds and formats tkinter widgets
     def Build(self):
