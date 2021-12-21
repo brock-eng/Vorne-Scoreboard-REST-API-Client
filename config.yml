@@ -31,7 +31,7 @@ duplicate_serial_prevention: True
 browserPath: "C:/Program Files/Internet Explorer/iexplore.exe"
 
 # CSV Run times file path
-time_data_file: "N:/ZBrock/Vorne/Run_Times_12_1_2021.csv"
+time_data_file: "G:/ZBrock/Vorne/Run_Times_12_1_2021.csv"
 
 # Toggle whether the program should attempt to lookup standard run times
 # If set to false, uses default times
