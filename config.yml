@@ -41,11 +41,11 @@ lookup_times: True
 # Factor for adjusting the ideal time found in oracle
 # If they are by default too high, multiply by a number < 1 (i.e. 0.9 for 10% reduction in ideal times)
 # If they are by default too low, multiply by a number > 1  (i.e. 1.1 for a 10% increase in ideal times)
-ideal_time_fudge_factor: 0.7
+ideal_time_fudge_factor: 0.8
 
 # Factor for adjusting the ideal time to an associated takt time
 ### takt_time = std_hours_in / team_size * ideal_time_fudge_factor * takt_time_factor
-takt_time_factor: 1.25
+takt_time_factor: 1
 
 # Minimum team count for efficiency calculations
-minimum_team_count: 15
+minimum_team_count: 12

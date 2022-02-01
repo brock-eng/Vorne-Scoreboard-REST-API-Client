@@ -15,7 +15,7 @@ from workstation import *
 from bytecanvas import *
 from programs import Program
 
-VERSION = str("1.7 (12/20/2021)")
+VERSION = str("2/1/2021")
 HOURS_TO_SECONDS = int(3600)
 MINUTES_TO_SECONDS = int(60)
 
@@ -24,7 +24,7 @@ class Application(Frame):
     def __init__(self) -> None:
         # Create and format widgets
         self.Build()
-
+        
         # Configure App, set Keybinds, class variables, etc.
         self.Configure()
 
