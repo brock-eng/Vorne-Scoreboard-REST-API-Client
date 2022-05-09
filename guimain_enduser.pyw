@@ -15,7 +15,7 @@ from workstation import *
 from bytecanvas import *
 from programs import Program
 
-VERSION = str("2/1/2021")
+VERSION = str("1.8 (5/9/2022)")
 HOURS_TO_SECONDS = int(3600)
 MINUTES_TO_SECONDS = int(60)
 
@@ -333,7 +333,6 @@ class Application(Frame):
         # Do not set a new part run if currently running same part
         currentPartNo = self.ws.GET("api/v0/part_run", jsonToggle=True)["data"]["part_id"]
         if str(partNo) == str(currentPartNo):
-            self.OutputConsole("Info: {" + str(partNo) + "} is already in production.  Incrementing count + 1")
             self.IncreaseCount()
 
         # New part run
@@ -428,6 +427,8 @@ class Application(Frame):
             self.SetPartNo(["Placeholder Part"])
         elif cmd == "CVGSEAT":
             self.SetPartNo(partNo = "CVG Seat", lookupTime=False)
+        elif cmd == "REFRESHPART":
+            self.RefreshPartRun()
         else:
             self.OutputConsole("Warning: Custom command not found: " + str(cmd))
 
@@ -488,7 +489,7 @@ class Application(Frame):
         _downtime = _idealTime * self.downtimeMultiplier
         _taktTime = _idealTime * self.taktTimeFactor
 
-        result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_taktTime * 1, downTime=_downtime)
+        result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_taktTime, downTime=_downtime)
 
         if result: 
             self.IncreaseCount()
@@ -535,6 +536,7 @@ class Application(Frame):
                     _downtime = _idealTime * self.downtimeMultiplier
                     _taktTime = _idealTime * self.taktTimeFactor
                 
+                print("Per/Hour: ", 60 * 60 / _taktTime)
                 print("Ideal: ",_idealTime, "\nTakt: ", _taktTime, "\n")
 
         for i in range(50):
