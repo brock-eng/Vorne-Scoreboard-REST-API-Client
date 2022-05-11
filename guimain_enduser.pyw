@@ -9,6 +9,8 @@ import webbrowser
 import yaml
 import time
 import csv
+import requests
+import json
 
 from keylogger import *
 from workstation import *
@@ -74,6 +76,7 @@ class Application(Frame):
         stream = open("config.yml", 'r')
         config = yaml.safe_load(stream)
         self.ws = WorkStation(ipAddress = config["ipAddress"], name = config["workstation"])
+        self.wcs = config["wc"]
         self.debugMode =            bool(config["debug_mode"])
         self.lookupSetting =        bool(config["lookup_times"])
         self.dupSNPrevention =      bool(config["duplicate_serial_prevention"])
@@ -82,6 +85,8 @@ class Application(Frame):
         self.idealTimeFudgeFactor = float(config["ideal_time_fudge_factor"])
         self.taktTimeFactor =       float(config["takt_time_factor"])
         self.minimumTeamCount =     int(config["minimum_team_count"])
+        self.pkey =                 str(config["pkey"])
+        print(self.wcs)
 
         # Class State Variables
         self.runningPrograms = dict()   # Custom programs
@@ -325,7 +330,7 @@ class Application(Frame):
             self.Display(["TURNON"])
 
         # If not using automatic run detection, start
-        null, currentInfoSource = self.ws.GetProcessState()
+        _, currentInfoSource = self.ws.GetProcessState()
         if currentInfoSource != "run_detector":
             self.OutputConsole("Starting auto detection.")
             self.ws.StartProduction()
@@ -347,11 +352,16 @@ class Application(Frame):
                     if currentTeamCount <= self.minimumTeamCount:
                         currentTeamCount = self.minimumTeamCount
 
-                    lookupTime = self.LookupTimes(partNo)
+                    try:
+                        lookupTime = self.LookupTimesOracle(partNo)
+                    except:
+                        self.OutputConsole("Error looking up timem in Oracle.  Attempting load from CSV file.")
+                        lookupTime = self.LookupTimes(partNo)
 
                     if lookupTime > 0: # found part time
                         _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
                     else: # not found or zero time amount, apply default times
+                        self.OutputConsole("Warning: Part time not found - applying default cycle times.")
                         _idealTime = self.defaultCycleTime
                 
                 # Default time settings
@@ -451,11 +461,39 @@ class Application(Frame):
                     break
             
             if not found:
-                self.OutputConsole("Could not find stdRunFactor for part: {0}".format(partNo))
+                self.OutputConsole("Could not find CSV stdRunFactor for part: {0}".format(partNo))
                 return float(-1)
             else:
-                self.OutputConsole("Found a part run time of {0} for part {1}".format(foundTime, partNo))
+                self.OutputConsole("Found CSV time of {0} for part {1}".format(foundTime, partNo))
                 return float(foundTime)
+
+    # Lookup std run times from oracle api endpoint
+    def LookupTimesOracle(self, partNo) -> float:
+        totalStdRunFactor = float(0)
+        totalCount = int(0)
+        for wc in self.wcs:
+            base = 'https://seats-api.seatsinc.com/ords/api1/partstdhours/json/'
+            _params = {'partno' : partNo, 'wc' : wc, 'pkey' : self.pkey}
+            response = requests.get(base, params=_params)
+            if (response.status_code != requests.codes.ok):
+                raise Exception('Error: bad http request made from Oracle Endpoint. Error code: ' + str(response.status_code))
+
+            parsed = json.loads(response.text)
+            totalStdRunFactorWc = float(0)
+            count = 0
+            for item in parsed['items']:
+                count += 1
+                totalStdRunFactorWc += item['machinestandardrunfac']
+            if count > 0:
+                totalStdRunFactorWc *= HOURS_TO_SECONDS
+                if totalStdRunFactorWc > totalStdRunFactor: 
+                    totalStdRunFactor = totalStdRunFactorWc
+                    totalCount = count
+
+        self.OutputConsole("Oracle time of {0} found for {1}".format(round(totalStdRunFactor, 4), partNo))
+        return totalStdRunFactor, totalCount
+        
+
 
     # Refresh the current part run with possibly updated settings
     def RefreshPartRun(self):
@@ -519,29 +557,20 @@ class Application(Frame):
 
         if self.lookupSetting:
             testPartNos = list()
-            testPartNos = ["183748VE1233", "186365FD31", "188760VD744", "185951VD1146"]
+            testPartNos = ["186588VD538", "188760VD744"]
             for partNo in testPartNos:
-                lookupTime = self.LookupTimes(partNo)
+                lookupTime, count = self.LookupTimesOracle(partNo)
                 currentTeamCount = 15
                 print(partNo)
                 print("Lookuptime:", lookupTime)
-                print("TeamSize:", currentTeamCount)
 
                 if lookupTime > 0: # found part time
                     _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
                     _downtime = _idealTime * self.downtimeMultiplier
                     _taktTime = _idealTime * self.taktTimeFactor
-                else: # not found, apply default times
-                    _idealTime = self.defaultCycleTime
-                    _downtime = _idealTime * self.downtimeMultiplier
-                    _taktTime = _idealTime * self.taktTimeFactor
                 
                 print("Per/Hour: ", 60 * 60 / _taktTime)
                 print("Ideal: ",_idealTime, "\nTakt: ", _taktTime, "\n")
-
-        for i in range(50):
-            self.OutputConsole("Test" + str(i))
-
 
 def main():
     ConsoleApp = Application()
