@@ -8,8 +8,6 @@ import random
 
 sleep = lambda t: time.sleep(t)
 
-
-
 # Scoreboard specific methods (displaying text, etc.)
 class Scoreboard:
     def __init__(self, workstation) -> None:
@@ -83,6 +81,9 @@ class Scoreboard:
         imageMapBytes = bytes(7860)
         self.SetImageMode(imageMapBytes)
         return
+
+
+
 
 
 # Class that holds all API methods for interacting with a Workstations Vorne scoreboard
