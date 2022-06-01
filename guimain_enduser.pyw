@@ -355,7 +355,7 @@ class Application(Frame):
                     try:
                         lookupTime = self.LookupTimesOracle(partNo)
                     except:
-                        self.OutputConsole("Error looking up timem in Oracle.  Attempting load from CSV file.")
+                        self.OutputConsole("Error looking up runtime in Oracle.  Attempting load from CSV file.")
                         lookupTime = self.LookupTimes(partNo)
 
                     if lookupTime > 0: # found part time
