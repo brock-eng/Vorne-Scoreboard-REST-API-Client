@@ -152,7 +152,6 @@ def main():
     testCanvas.Fill(0, 0, 80, 31, "R1")
     testCanvas.Print()
     print('finished')
-
     return
 
 if __name__ == '__main__': main()
