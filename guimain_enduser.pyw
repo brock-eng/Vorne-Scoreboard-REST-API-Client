@@ -356,7 +356,7 @@ class Application(Frame):
                         lookupTime = self.LookupTimesOracle(partNo)
                     except:
                         self.OutputConsole("Error looking up runtime in Oracle.  Attempting load from CSV file.")
-                        lookupTime = self.LookupTimes(partNo)
+                        lookupTime = self.LookupTimesCSVFile(partNo)
 
                     if lookupTime > 0: # found part time
                         _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
@@ -443,7 +443,7 @@ class Application(Frame):
             self.OutputConsole("Warning: Custom command not found: " + str(cmd))
 
     # Lookup std run times from a pre-built csv file
-    def LookupTimes(self, partNo) -> float:
+    def LookupTimesCSVFile(self, partNo) -> float:
         with open(self.dataFilePath) as dataFile:
             dataReader = csv.reader(dataFile)
             found = False
@@ -492,48 +492,6 @@ class Application(Frame):
 
         self.OutputConsole("Oracle time of {0} found for {1}".format(round(totalStdRunFactor, 4), partNo))
         return totalStdRunFactor, totalCount
-        
-
-
-    # Refresh the current part run with possibly updated settings
-    def RefreshPartRun(self):
-        
-        partNo = self.ws.GET("api/v0/part_run", jsonToggle=True)["data"]["part_id"]
-        
-        try:
-            # Dynamic time lookup
-            if self.lookupSetting:
-                # Get current team, if < 0 set to a default of 10
-                currentTeamCount = self.ws.GetTeam()
-                if currentTeamCount <= 0: 
-                    currentTeamCount = 14
-                    self.OutputConsole("Warning: Did not find a correct team size.  Defaulted to 14.")
-                elif currentTeamCount <= self.minimumTeamCount:
-                    currentTeamCount = self.minimumTeamCount
-
-                lookupTime = self.LookupTimes(partNo)
-                if lookupTime > 0: # found part time
-                    _idealTime = lookupTime / float(currentTeamCount) * self.idealTimeFudgeFactor
-                else: # not found or zero time amount, apply default times
-                    _idealTime = self.defaultCycleTime
-            
-            # Default time settings
-            else:
-                _idealTime = self.defaultCycleTime
-        except: 
-            self.OutputConsole("Program error: Could not lookup times for part {0}".format(partNo))
-            _idealTime = self.defaultCycleTime
-
-        _downtime = _idealTime * self.downtimeMultiplier
-        _taktTime = _idealTime * self.taktTimeFactor
-
-        result = self.ws.SetPart(partNo, changeOver=False, ideal=_idealTime, takt=_taktTime, downTime=_downtime)
-
-        if result: 
-            self.IncreaseCount()
-            self.OutputConsole("Set {" + self.ws.name + "} part run to " + str(partNo) + ".")
-        else: 
-            self.OutputConsole("Failed to set a to new part run.")
 
     # Run the application
     def Run(self):
@@ -557,7 +515,7 @@ class Application(Frame):
 
         if self.lookupSetting:
             testPartNos = list()
-            testPartNos = ["186588VD538", "188760VD744"]
+            testPartNos = ["186588VD538", "188760VD744", "189514VD755"]
             for partNo in testPartNos:
                 lookupTime, count = self.LookupTimesOracle(partNo)
                 currentTeamCount = 15
